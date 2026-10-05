@@ -1,53 +1,109 @@
 # arche
 
-state management for pygame
+state management for small games, with the platform kept at arm's length.
+
+![crates title screen](docs/title.png)
+
+Games are a stack of states. A state never touches the stack, the screen or
+the keyboard. Instead it:
+
+- **returns effects** (`Push`, `Pop`, `Set`, `Quit`) from any hook, and the stack interprets them
+- **hands results back**: `Pop(result)` arrives in the state underneath as `on_resume(result)`
+- **runs scripts**: a generator that yields effects, so cutscenes read top to bottom
+- **describes what to show** as plain scene nodes, which a *shell* turns into pixels or characters
+
+Because the core is pure Python and runs on a fixed timestep, a whole play
+session is just a seed plus a list of `(tick, action)` pairs. Recording,
+replaying and testing come for free.
 
 ```python
-# coding: utf-8
+from arche import Pop, Push, State, Wait, on, scene as s
 
-from arche import (
-    draw, trans, pygame,
-    State, ContextBuilder)
+class Say(State):
+    overlay = True                          # the state underneath keeps drawing
 
-class PausedState(State):
-    def handle_keydown_event(self, event):
-        if event.key in [pygame.K_p, pygame.K_ESCAPE]:
-            return trans.POP()
+    def __init__(self, text):
+        self.text = text
 
-    def draw(self, ctx, interpolation):
-        draw.clear(ctx, (255, 255, 255))
-        draw.rect(ctx, (0, 0, 0), self.ctx.rect)
+    @on('confirm')
+    def close(self, _):
+        return Pop()
 
-class MainState(State):
-    def on_start(self):
-        self.ctx.pos  = [0, 0]
-        self.ctx.rect = pygame.Rect(0, 0, 10, 10)
+    def view(self):
+        yield s.Frame(1, 12, 30, 5, '#ff6ad5', '#241c33')
+        yield s.Text(2, 13, self.text, '#f4eefa')
 
-    def handle_keydown_event(self, event):
-        return {
-            pygame.K_p     : trans.PUSH(PausedState),
-            pygame.K_s     : trans.SET(PausedState),
-            pygame.K_ESCAPE: trans.POP()
-        }.get(event.key, None)
 
-    def update(self, ctx, dt):
-        if ctx.rect.x > ctx.config['size'][0]:
-            ctx.pos = [0, 0]
-
-        ctx.pos[0] += 100 * dt
-        ctx.pos[1] += 100 * dt
-        ctx.rect.update(ctx.pos, (10, 10))
-
-    def draw(self, ctx, interpolation):
-        draw.clear(ctx, (0, 0, 0))
-        draw.rect(ctx, (255, 255, 255), ctx.rect)
-
-if __name__ == '__main__':
-    ContextBuilder('?', 400, 400) \
-        .grab_mouse(False) \
-        .resizable(True) \
-        .step(120) \
-        .fps(75) \
-        .build() \
-        .run(MainState)
+class Shop(State):
+    def script(self):
+        yield Push(Say('a sword? that will be 10 gold.'))
+        if (yield Push(Confirm())):         # resumes with whatever Confirm pops
+            self.gold -= 10
+        yield Wait(0.5)                     # game time, so pausing pauses it
+        return Pop()
 ```
+
+## the demo: crates
+
+A small Sokoban with a title screen and attract mode, a scripted intro,
+level select, pause and win overlays, undo, a robot that demonstrates the
+solution, and par/stars.
+
+```sh
+uv run python examples/crates                       # pygame-ce window
+uv run python examples/crates --shell terminal      # same game, in your terminal
+uv run python examples/crates --record run.json     # save your session
+uv run python examples/crates --replay run.json     # watch it back, then take over
+```
+
+Keys: arrows/wasd/hjkl move, `z` undo, `r` restart, `tab` robot, `esc` menu,
+`f1` or `` ` `` debug overlay.
+
+| intro (a script) | win overlay (`Pop(result)`) | debug overlay |
+|---|---|---|
+| ![](docs/intro.png) | ![](docs/win.png) | ![](docs/debug.png) |
+
+The terminal shell renders the same nodes, two columns per cell:
+
+```
+        [][][]  [][]      []    [][][]  [][][]  [][][]
+        []      []  []  []  []    []    []      []
+        []      [][]    [][][]    []    [][]    [][][]
+        []      []  []  []  []    []    []          []
+        [][][]  []  []  []  []    []    [][][]  [][][]
+
+                          ████████████
+                          ██    ◖◗  ██
+                          ██      []██
+                          ██    []··██
+                          ████████████
+```
+
+## layout
+
+```
+arche/
+  effects.py     Push / Pop / Set / Quit / Wait
+  state.py       State, @on(action), @every(seconds)
+  stack.py       the effect interpreter: lifecycle, timers, scripts, overlays
+  runtime.py     fixed timestep, input log, replays, debug overlay
+  scene.py       platform-neutral nodes: Clear, Fill, Frame, Tile, Text, Dim
+  shells/
+    pygame.py    a window (and offscreen screenshots)
+    terminal.py  truecolor ANSI, plus a plain-text renderer for tests
+examples/crates/ the demo
+tests/
+```
+
+Writing a new shell means turning keys into action names, and scene nodes
+into whatever your platform draws. A fridge works, if it has enough LEDs.
+
+## tests
+
+```sh
+uv run pytest
+```
+
+The game tests play whole sessions headlessly, check that every level's
+stored solution works (and is optimal), and check that a recorded session
+replays to exactly the same frame.

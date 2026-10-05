@@ -1,11 +1,11 @@
 # coding: utf-8
+"""arche: state management for small games, with the platform kept at arm's length."""
 
-__import__('os').environ['PYGAME_HIDE_SUPPORT_PROMPT'] = '1'
+from . import scene
+from .effects import Effect, Effects, Pop, Push, Quit, Set, Wait
+from .runtime import Runtime
+from .state import State, every, on
 
-import pygame
-
-from .core import trans
-from .core.state import State, StateManager
-from .core.context import Context, ContextBuilder
-
-from .graphics import draw
+__all__ = [
+    'Effect', 'Effects', 'Pop', 'Push', 'Quit', 'Runtime', 'Set',
+    'State', 'Wait', 'every', 'on', 'scene']
