@@ -1,0 +1,17 @@
+[package]
+name = "crates-demo"
+version = "0.1.0"
+edition = "2024"
+description = "crates: a tiny Sokoban built on arche"
+
+[[bin]]
+name = "crates"
+path = "src/main.rs"
+
+[dependencies]
+arche = { path = "../arche" }
+
+[features]
+default = ["terminal", "window"]
+terminal = ["arche/terminal"]
+window = ["arche/window"]

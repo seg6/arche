@@ -79,6 +79,16 @@ The terminal shell renders the same nodes, two columns per cell:
                           ████████████
 ```
 
+## in Rust too
+
+[`rust/`](rust/) has the same library and the same game in Rust. Scripts
+there are `async` blocks, driven by arche's own tiny executor:
+
+```rust
+cx.wait(0.5).await;
+let answer = cx.push(Confirm::new()).await.take::<bool>();
+```
+
 ## layout
 
 ```

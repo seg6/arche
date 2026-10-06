@@ -45,8 +45,11 @@ def main() -> None:
                 while rt.running and rt.replaying:
                     frame, stack = terminal.to_text(rt.view(), rt.size), list(rt.stack.frames)
                     rt.tick()
+                if rt.running:
+                    rt.run_headless(max_ticks=rt.ticks + 90)   # let the last input play out
+                    frame, stack = terminal.to_text(rt.view(), rt.size), list(rt.stack.frames)
                 print(frame)
-                print(f'\nlast frame before tick {rt.ticks}, stack: {[f.state for f in stack]}')
+                print(f'\ntick {rt.ticks}, stack: {[f.state for f in stack]}')
     finally:
         if args.record:
             rt.save_log(args.record)
